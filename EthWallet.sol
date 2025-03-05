@@ -2,22 +2,25 @@
 
 pragma solidity ^0.8.24;
 
+import "./interfaces/ICalculateFees.sol";
+
 error NotEnoughFunds(address, uint256);
 
 contract EthWallet {
 
-    uint256 public constant FEE = 1; //1% Fixed transaction fee
-
     address public owner;
+    address public txOrigin;
+    address public calculateFees;
     mapping(address => uint256) private balances;
     uint256 public fees;
 
-    constructor() {
+    constructor(address calculateFees_) {
         owner = msg.sender;
+        calculateFees = calculateFees_;
     }
 
-    modifier onlyOwner {
-        require(msg.sender == owner, "You are not the owner");
+    modifier onlyOwner { // 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4
+        require(msg.sender == owner, "You are not the owner"); // 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
         _;
     }
 
@@ -42,12 +45,13 @@ contract EthWallet {
     function transfer(uint256 amount, address payable to) public {
         require(amount <= balances[msg.sender], "Not enough funds");
 
-        uint256 fee_ = calculateFee(amount);
+        // uint256 fee_ = calculateFee(amount);
+        uint256 fee_ = ICalculateFees(calculateFees).calculateFee(amount);
         uint256 amountFee_ = amount - fee_; 
 
         fees += fee_;
         balances[msg.sender] -= amount;
-        balances[to] += amount;
+        balances[to] += amountFee_;
         (bool sent,) = to.call{value: amountFee_}(""); 
         require(sent, "Transfer failed");
     }
@@ -68,10 +72,6 @@ contract EthWallet {
         fees = 0;
         (bool sent, ) = owner.call{value: fees}("");
         require(sent, "Transfer failed");
-    }
-
-    function calculateFee(uint256 amount) private pure returns(uint256) {
-        return (amount * FEE) / 100;
     }
 
 }
